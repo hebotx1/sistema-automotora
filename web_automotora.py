@@ -1314,41 +1314,56 @@ with tab2:
             st.session_state["menu_clientes"] = "modificar"
     st.write("")
 
+    # --------------------------------------------------------
+    # MÓDULO A: REGISTRAR NUEVO CLIENTE
+    # --------------------------------------------------------
     if st.session_state["menu_clientes"] == "crear":
         st.subheader("Registrar Nuevo Cliente")
-        with st.form("form_nuevo_cliente", clear_on_submit=True):
-            st.markdown("**Datos obligatorios**")
-            c1, c2 = st.columns(2)
-            with c1:
-                rut_n = st.text_input("RUT *")
-                razon_n = st.text_input("Razón Social *")
-                fantasia_n = st.text_input("Nombre Fantasía")
-                giro_n = st.text_input("Giro")
-                direccion_n = st.text_input("Dirección")
-                comuna_n = st.text_input("Comuna")
-            with c2:
-                ciudad_n = st.text_input("Ciudad")
-                telefono_n = st.text_input("Teléfono")
-                telefono2_n = st.text_input("Teléfono 2")
-                email_n = st.text_input("E-Mail")
-                web_n = st.text_input("Web")
-                contacto_n = st.text_input("Contacto Comercial")
+        
+        st.markdown("**Datos obligatorios**")
+        c1, c2 = st.columns(2)
+        with c1:
+            rut_n = st.text_input("RUT * (Ej: 16328681-5 o 163286815)")
+            razon_n = st.text_input("Razón Social *")
+            fantasia_n = st.text_input("Nombre Fantasía")
+            giro_n = st.text_input("Giro")
+            direccion_n = st.text_input("Dirección")
+            comuna_n = st.text_input("Comuna")
+        with c2:
+            ciudad_n = st.text_input("Ciudad")
+            telefono_n = st.text_input("Teléfono")
+            telefono2_n = st.text_input("Teléfono 2")
+            email_n = st.text_input("E-Mail")
+            web_n = st.text_input("Web")
+            contacto_n = st.text_input("Contacto Comercial")
 
-            st.markdown("**Datos comerciales**")
-            c3, c4 = st.columns(2)
-            with c3: forma_pago_n = st.selectbox("Forma de Pago", ["CONTADO", "CRÉDITO 30 DÍAS", "CRÉDITO 60 DÍAS"])
-            with c4: observaciones_n = st.text_area("Observaciones")
+        st.markdown("**Datos comerciales**")
+        c3, c4 = st.columns(2)
+        with c3: 
+            forma_pago_n = st.selectbox("Forma de Pago", ["CONTADO", "CRÉDITO 30 DÍAS", "CRÉDITO 60 DÍAS"])
+        with c4: 
+            observaciones_n = st.text_area("Observaciones")
 
-            guardar_cliente = st.form_submit_button("💾 Guardar Cliente")
+        st.write("")
+        # Botón de guardado libre de st.form
+        guardar_cliente = st.button("💾 Guardar Cliente", use_container_width=True, type="primary")
 
         if guardar_cliente:
             if not rut_n or not razon_n:
                 st.error("⚠️ El RUT y la Razón Social son obligatorios.")
             else:
-                v_rut, r_rut = validar_rut(rut_n)
-                if not v_rut: st.error("❌ El RUT del Cliente es inválido.")
+                # Limpieza inteligente del RUT para validar
+                rut_limpio = rut_n.replace(".","").replace("-","").strip()
+                v_rut, r_rut = validar_rut(rut_limpio)
+                
+                if not v_rut: 
+                    st.error("❌ El RUT del Cliente es inválido.")
                 else:
                     try:
+                        # Aseguramos el formato con guion para la Base de Datos
+                        if len(r_rut) > 1:
+                            r_rut = f"{r_rut[:-1]}-{r_rut[-1]}"
+
                         con = conectar_bd()
                         cur = con.cursor()
                         cur.execute("""
@@ -1364,73 +1379,95 @@ with tab2:
                         ))
                         con.commit()
                         st.success(f"✅ Cliente **{razon_n.upper()}** ({r_rut}) registrado correctamente.")
-                    except pg_errors.UniqueViolation: st.error("❌ Ese RUT ya existe en el sistema.")
-                    except Exception as e: st.error(f"❌ Error: {e}")
+                    except pg_errors.UniqueViolation: 
+                        st.error("❌ Ese RUT ya existe en el sistema.")
+                    except Exception as e: 
+                        st.error(f"❌ Error: {e}")
                     finally:
                         if "cur" in locals(): cur.close()
                         if "con" in locals(): con.close()
 
+    # --------------------------------------------------------
+    # MÓDULO B: MODIFICAR CLIENTE EXISTENTE
+    # --------------------------------------------------------
     elif st.session_state["menu_clientes"] == "modificar":
         st.subheader("Modificar Cliente Existente")
-        rut_mod = st.text_input("Ingresa el RUT a buscar:", key="rut_modificar")
+        rut_mod = st.text_input("Ingresa el RUT a buscar (con o sin guion):", key="rut_modificar")
 
-        if st.button("🔎 Buscar Cliente"):
-            if not rut_mod.strip(): st.warning("Ingresa un RUT.")
+        if st.button("🔎 Buscar Cliente", use_container_width=True):
+            if not rut_mod.strip(): 
+                st.warning("⚠️ Ingresa un RUT válido.")
             else:
+                # Transformamos la búsqueda para que calce exacto con la base de datos
+                rut_limpio = rut_mod.replace(".", "").replace("-", "").strip()
+                if len(rut_limpio) > 1:
+                    rut_formateado = f"{rut_limpio[:-1]}-{rut_limpio[-1]}"
+                else:
+                    rut_formateado = rut_mod
+
                 try:
                     con = conectar_bd()
                     cur = con.cursor()
-                    cur.execute("SELECT * FROM clientes WHERE rut ILIKE %s", (f"%{rut_mod.replace('.','').replace('-','').strip()}%",))
+                    cur.execute("SELECT * FROM clientes WHERE rut = %s", (rut_formateado,))
                     cols = [d[0] for d in cur.description]
                     fila = cur.fetchone()
+                    
                     if fila:
                         st.session_state["cliente_mod"] = dict(zip(cols, fila))
-                        st.success("Cliente encontrado.")
-                    else: st.error("No se encontró ningún cliente.")
-                except Exception as e: st.error(f"Error: {e}")
+                        st.success("✅ Cliente encontrado. Modifica los datos abajo:")
+                    else: 
+                        st.error(f"❌ No se encontró ningún cliente con el RUT {rut_formateado}.")
+                except Exception as e: 
+                    st.error(f"Error: {e}")
                 finally:
                     if "cur" in locals(): cur.close()
                     if "con" in locals(): con.close()
 
         if "cliente_mod" in st.session_state:
             c = st.session_state["cliente_mod"]
-            with st.form("form_mod_cliente"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    razon_m = st.text_input("Razón Social *", value=c.get("razon_social",""))
-                    fantasia_m = st.text_input("Nombre Fantasía", value=c.get("nombre_fantasia",""))
-                    giro_m = st.text_input("Giro", value=c.get("giro",""))
-                    dir_m = st.text_input("Dirección", value=c.get("direccion",""))
-                    comuna_m = st.text_input("Comuna", value=c.get("comuna",""))
-                with c2:
-                    ciudad_m = st.text_input("Ciudad", value=c.get("ciudad",""))
-                    tel_m = st.text_input("Teléfono", value=c.get("telefono",""))
-                    tel2_m = st.text_input("Teléfono 2", value=c.get("telefono2",""))
-                    email_m = st.text_input("E-Mail", value=c.get("email",""))
-                    obs_m = st.text_area("Observaciones", value=c.get("observaciones",""))
-                actualizar = st.form_submit_button("💾 Actualizar Cliente")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                razon_m = st.text_input("Razón Social *", value=c.get("razon_social",""))
+                fantasia_m = st.text_input("Nombre Fantasía", value=c.get("nombre_fantasia",""))
+                giro_m = st.text_input("Giro", value=c.get("giro",""))
+                dir_m = st.text_input("Dirección", value=c.get("direccion",""))
+                comuna_m = st.text_input("Comuna", value=c.get("comuna",""))
+            with c2:
+                ciudad_m = st.text_input("Ciudad", value=c.get("ciudad",""))
+                tel_m = st.text_input("Teléfono", value=c.get("telefono",""))
+                tel2_m = st.text_input("Teléfono 2", value=c.get("telefono2",""))
+                email_m = st.text_input("E-Mail", value=c.get("email",""))
+                obs_m = st.text_area("Observaciones", value=c.get("observaciones",""))
+            
+            st.write("")
+            actualizar = st.button("💾 Actualizar Cliente", use_container_width=True, type="primary")
 
             if actualizar:
-                try:
-                    con = conectar_bd()
-                    cur = con.cursor()
-                    cur.execute("""
-                        UPDATE clientes SET
-                            razon_social=%s, nombre_fantasia=%s, giro=%s, direccion=%s, comuna=%s, ciudad=%s,
-                            telefono=%s, telefono2=%s, email=%s, observaciones=%s
-                        WHERE rut=%s
-                    """, (
-                        razon_m.upper(), fantasia_m.upper() or None, giro_m.upper() or None,
-                        dir_m or None, comuna_m.upper() or None, ciudad_m.upper() or None,
-                        tel_m or None, tel2_m or None, email_m or None, obs_m or None, c["rut"]
-                    ))
-                    con.commit()
-                    st.success("✅ Cliente actualizado.")
-                    del st.session_state["cliente_mod"]
-                except Exception as e: st.error(f"❌ Error: {e}")
-                finally:
-                    if "cur" in locals(): cur.close()
-                    if "con" in locals(): con.close()
+                if not razon_m.strip():
+                    st.error("⚠️ La Razón Social no puede estar vacía.")
+                else:
+                    try:
+                        con = conectar_bd()
+                        cur = con.cursor()
+                        cur.execute("""
+                            UPDATE clientes SET
+                                razon_social=%s, nombre_fantasia=%s, giro=%s, direccion=%s, comuna=%s, ciudad=%s,
+                                telefono=%s, telefono2=%s, email=%s, observaciones=%s
+                            WHERE rut=%s
+                        """, (
+                            razon_m.upper(), fantasia_m.upper() or None, giro_m.upper() or None,
+                            dir_m or None, comuna_m.upper() or None, ciudad_m.upper() or None,
+                            tel_m or None, tel2_m or None, email_m or None, obs_m or None, c["rut"]
+                        ))
+                        con.commit()
+                        st.success("✅ ¡Cliente actualizado exitosamente!")
+                        del st.session_state["cliente_mod"]
+                    except Exception as e: 
+                        st.error(f"❌ Error: {e}")
+                    finally:
+                        if "cur" in locals(): cur.close()
+                        if "con" in locals(): con.close()
 
 # ================================================================
 # PESTAÑA 3 — GESTIÓN DE VEHÍCULOS
@@ -1442,89 +1479,133 @@ with tab3:
     st.markdown("**¿Qué deseas hacer en Vehículos?**")
     col_veh1, col_veh2 = st.columns(2)
     with col_veh1:
-        if st.button("➕ Registrar nuevo vehículo", key="btn_veh_crear", use_container_width=True):
+        if st.button("➕ Registrar nuevo vehículo", use_container_width=True):
             st.session_state["menu_vehiculos"] = "crear"
     with col_veh2:
-        if st.button("✏️ Modificar vehículo existente", key="btn_veh_mod", use_container_width=True):
+        if st.button("✏️ Modificar vehículo existente", use_container_width=True):
             st.session_state["menu_vehiculos"] = "modificar"
     st.write("")
 
+    # --------------------------------------------------------
+    # MÓDULO A: REGISTRAR NUEVO VEHÍCULO
+    # --------------------------------------------------------
     if st.session_state["menu_vehiculos"] == "crear":
         st.subheader("Registrar Nuevo Vehículo")
-        with st.form("form_nuevo_vehiculo", clear_on_submit=True):
-            st.markdown("**Datos del Vehículo**")
-            v1, v2 = st.columns(2)
-            with v1:
-                patente_v = st.text_input("Patente *")
-                marca_v = st.text_input("Marca")
-                modelo_v = st.text_input("Modelo")
-                año_v = st.number_input("Año", min_value=1900, max_value=2100, step=1, value=2020)
-                km_v = st.number_input("Kilometraje", min_value=0, step=1000)
-            with v2:
-                chasis_v = st.text_input("Nro de Chasis")
-                motor_v = st.text_input("Nro de Motor")
-                puertas_v = st.number_input("Nro de Puertas", min_value=0, max_value=10, step=1, value=4)
-                color_v = st.text_input("Color")
+        st.info("💡 Escribe los datos libremente. Los valores económicos se sumarán automáticamente en tiempo real.")
+        
+        st.markdown("**🚗 Datos Técnicos del Vehículo**")
+        v1, v2 = st.columns(2)
+        with v1:
+            patente_v = st.text_input("Patente *")
+            marca_v = st.text_input("Marca")
+            modelo_v = st.text_input("Modelo")
+            año_v = st.number_input("Año", min_value=1900, max_value=2100, step=1, value=2026)
+            km_v = st.number_input("Kilometraje", min_value=0, step=1000)
+        with v2:
+            chasis_v = st.text_input("Nro de Chasis")
+            motor_v = st.text_input("Nro de Motor")
+            puertas_v = st.number_input("Nro de Puertas", min_value=0, max_value=10, step=1, value=4)
+            color_v = st.text_input("Color")
 
-            st.markdown("**Datos del Cliente (quien trae el vehículo)**")
-            d1, d2 = st.columns(2)
-            with d1: rut_cli_v = st.text_input("RUT Cliente *")
-            with d2: st.markdown("_El nombre se vincula automáticamente por el RUT._")
+        st.markdown("---")
+        
+        # --- SECCIÓN ECONÓMICA 100% EN VIVO ---
+        st.markdown("### 💰 Detalles Económicos y Financieros")
+        st.markdown("_Puedes ingresar los montos con o sin puntos (Ej: 10.000.000 o 10000000)_")
+        col_eco1, col_eco2, col_eco3 = st.columns(3)
+        
+        with col_eco1:
+            txt_valor = st.text_input("Valor Vehículo ($) *", value="0", key="txt_val_crear")
+            valor_v = int(txt_valor.replace(".", "").replace("$", "").strip() or 0)
+            st.caption(f"🔎 Sombra: **${valor_v:,.0f}**".replace(",", "."))
+            
+        with col_eco2:
+            txt_comision = st.text_input("Comisión ($) *", value="0", key="txt_com_crear")
+            comision_v = int(txt_comision.replace(".", "").replace("$", "").strip() or 0)
+            st.caption(f"🔎 Sombra: **${comision_v:,.0f}**".replace(",", "."))
+            
+        with col_eco3:
+            txt_transferencia = st.text_input("Transferencia ($) *", value="0", key="txt_tra_crear")
+            transferencia_v = int(txt_transferencia.replace(".", "").replace("$", "").strip() or 0)
+            st.caption(f"🔎 Sombra: **${transferencia_v:,.0f}**".replace(",", "."))
+        
+        valor_final_v = valor_v + comision_v + transferencia_v
+        st.success(f"💵 **Valor Final Calculado (En Tiempo Real):** ${valor_final_v:,.0f}".replace(",", "."))
+        
+        st.markdown("---")
 
-            st.markdown("**Datos del Dueño del Vehículo** _(si es distinto al cliente)_")
-            e1, e2 = st.columns(2)
-            with e1:
-                nombre_dueno_v = st.text_input("Nombre Dueño Vehículo")
-                rut_dueno_v = st.text_input("RUT Dueño Vehículo")
-                dir_dueno_v = st.text_input("Dirección Dueño")
-            with e2:
-                tel_dueno_v = st.text_input("Teléfono Dueño")
-                email_dueno_v = st.text_input("E-Mail Dueño")
+        st.markdown("**👤 Datos del Cliente (quien trae el vehículo)**")
+        rut_cli_v = st.text_input("RUT Cliente * (Acepta con o sin guion)")
+        st.markdown("<p style='color: gray; font-size: 12px; margin-top: -10px;'>El cliente debe estar creado previamente en la pestaña Clientes.</p>", unsafe_allow_html=True)
 
-            guardar_veh = st.form_submit_button("💾 Guardar Vehículo")
+        st.markdown("**📋 Datos del Dueño del Vehículo** *(si es distinto al cliente)*")
+        e1, e2 = st.columns(2)
+        with e1:
+            nombre_dueno_v = st.text_input("Nombre Dueño Vehículo")
+            rut_dueno_v = st.text_input("RUT Dueño Vehículo (Acepta con o sin guion)")
+            dir_dueno_v = st.text_input("Dirección Dueño")
+        with e2:
+            tel_dueno_v = st.text_input("Teléfono Dueño")
+            email_dueno_v = st.text_input("E-Mail Dueño")
 
-        if guardar_veh:
+        st.write("")
+        if st.button("💾 Guardar Registro de Vehículo Completo", use_container_width=True, type="primary"):
             if not patente_v or not rut_cli_v:
-                st.error("⚠️ La Patente y el RUT del cliente son obligatorios.")
+                st.error("❌ Error: La Patente y el RUT del Cliente son obligatorios.")
             else:
-                v_cli, r_cli = validar_rut(rut_cli_v)
-                v_due, r_due = validar_rut(rut_dueno_v)
+                rut_cli_limpio = rut_cli_v.replace(".","").replace("-","").strip()
+                rut_due_limpio = rut_dueno_v.replace(".","").replace("-","").strip()
+                
+                v_cli, r_cli = validar_rut(rut_cli_limpio)
+                v_due, r_due = validar_rut(rut_due_limpio) if rut_due_limpio else (True, None)
 
-                if not v_cli: st.error("❌ RUT Cliente inválido.")
-                elif not v_due: st.error("❌ RUT Dueño inválido.")
+                if not v_cli: st.error("❌ El RUT del Cliente ingresado no es válido.")
+                elif rut_due_limpio and not v_due: st.error("❌ El RUT del Dueño ingresado no es válido.")
                 else:
                     try:
                         patente_limpia = patente_v.upper().replace("-","").replace(" ","").strip()
+
                         con = conectar_bd()
                         cur = con.cursor()
+                        
+                        # Usamos r_cli directamente (que ya viene con un solo guion de la funcion validar_rut)
                         cur.execute("SELECT razon_social FROM clientes WHERE rut=%s", (r_cli,))
                         cli = cur.fetchone()
+                        
                         if not cli:
-                            st.error(f"❌ No existe un cliente con RUT {r_cli}. Regístralo primero en la pestaña Clientes.")
+                            st.error(f"❌ El cliente con RUT {r_cli} no está registrado. Ingrésalo primero en la pestaña 'Clientes'.")
                         else:
                             cur.execute("""
                                 INSERT INTO vehiculos (
                                     patente, marca, modelo, año, kilometraje, nro_chasis, nro_motor, nro_puertas, color,
-                                    rut_cliente, nombre_dueno_vehiculo, rut_dueno_vehiculo, direccion_dueno_vehiculo, telefono_dueno_vehiculo, email_dueno_vehiculo
-                                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                                    rut_cliente, nombre_dueno_vehiculo, rut_dueno_vehiculo, direccion_dueno_vehiculo, telefono_dueno_vehiculo, email_dueno_vehiculo,
+                                    valor, comision, transferencia, valor_final
+                                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                             """, (
                                 patente_limpia, marca_v.upper() or None, modelo_v.upper() or None, año_v, km_v,
                                 chasis_v or None, motor_v or None, puertas_v, color_v.upper() or None,
-                                r_cli, nombre_dueno_v.upper() or None, r_due or None, dir_dueno_v or None, tel_dueno_v or None, email_dueno_v or None
+                                r_cli, nombre_dueno_v.upper() or None, r_due or None, dir_dueno_v or None, tel_dueno_v or None, email_dueno_v or None,
+                                valor_v, comision_v, transferencia_v, valor_final_v
                             ))
                             con.commit()
-                            st.success(f"✅ Vehículo **{patente_limpia}** registrado a nombre de: {cli[0]}")
-                    except pg_errors.UniqueViolation: st.error("❌ Esa patente ya está registrada.")
-                    except Exception as e: st.error(f"❌ Error: {e}")
+                            st.success(f"✅ ¡Vehículo **{patente_limpia}** registrado a nombre de {cli[0]}!")
+                    except pg_errors.UniqueViolation: 
+                        st.error("❌ Error: Esa patente ya se encuentra registrada.")
+                    except Exception as e: 
+                        st.error(f"❌ Error: {e}")
                     finally:
                         if "cur" in locals(): cur.close()
                         if "con" in locals(): con.close()
 
+    # --------------------------------------------------------
+    # MÓDULO B: MODIFICAR VEHÍCULO EXISTENTE
+    # --------------------------------------------------------
     elif st.session_state["menu_vehiculos"] == "modificar":
         st.subheader("Modificar Vehículo Existente")
-        pat_mod = st.text_input("Ingresa la Patente a buscar:", key="pat_modificar")
-        if st.button("🔎 Buscar Vehículo"):
-            if not pat_mod.strip(): st.warning("Ingresa una patente.")
+        pat_mod = st.text_input("Ingresa la Patente a buscar:")
+        
+        if st.button("🔎 Buscar Vehículo", use_container_width=True):
+            if not pat_mod.strip(): st.warning("⚠️ Ingresa una patente.")
             else:
                 try:
                     con = conectar_bd()
@@ -1534,39 +1615,69 @@ with tab3:
                     fila = cur.fetchone()
                     if fila:
                         st.session_state["vehiculo_mod"] = dict(zip(cols, fila))
-                        st.success("Vehículo encontrado.")
-                    else: st.error("No se encontró ningún vehículo con esa patente.")
-                except Exception as e: st.error(f"Error: {e}")
+                    else: 
+                        st.error("❌ Vehículo no encontrado.")
+                except Exception as e: st.error(f"❌ Error: {e}")
                 finally:
                     if "cur" in locals(): cur.close()
                     if "con" in locals(): con.close()
 
         if "vehiculo_mod" in st.session_state:
             v = st.session_state["vehiculo_mod"]
-            with st.form("form_mod_vehiculo"):
-                mv1, mv2 = st.columns(2)
-                with mv1:
-                    marca_m = st.text_input("Marca", value=v.get("marca",""))
-                    modelo_m = st.text_input("Modelo", value=v.get("modelo",""))
-                    año_m = st.number_input("Año", value=int(v.get("año") or 2020), min_value=1900, max_value=2100)
-                    km_m = st.number_input("Kilometraje", value=int(v.get("kilometraje") or 0), min_value=0)
-                with mv2:
-                    chasis_m = st.text_input("Nro Chasis", value=v.get("nro_chasis",""))
-                    motor_m = st.text_input("Nro Motor", value=v.get("nro_motor",""))
-                    puertas_m = st.number_input("Puertas", value=int(v.get("nro_puertas") or 4), min_value=0, max_value=10)
-                    color_m = st.text_input("Color", value=v.get("color",""))
+            st.success("✅ Vehículo encontrado. Modifica los campos abajo:")
+            
+            mv1, mv2 = st.columns(2)
+            with mv1:
+                marca_m = st.text_input("Marca", value=v.get("marca",""))
+                modelo_m = st.text_input("Modelo", value=v.get("modelo",""))
+                año_m = st.number_input("Año", value=int(v.get("año") or 2026), min_value=1900, max_value=2100)
+                km_m = st.number_input("Kilometraje", value=int(v.get("kilometraje") or 0), min_value=0)
+            with mv2:
+                chasis_m = st.text_input("Nro Chasis", value=v.get("nro_chasis",""))
+                motor_m = st.text_input("Nro Motor", value=v.get("nro_motor",""))
+                puertas_m = st.number_input("Puertas", value=int(v.get("nro_puertas") or 4), min_value=0, max_value=10)
+                color_m = st.text_input("Color", value=v.get("color",""))
 
-                nombre_d_m = st.text_input("Nombre Dueño", value=v.get("nombre_dueno_vehiculo",""))
-                rut_d_m = st.text_input("RUT Dueño", value=v.get("rut_dueno_vehiculo",""))
-                dir_d_m = st.text_input("Dirección Dueño", value=v.get("direccion_dueno_vehiculo",""))
-                tel_d_m = st.text_input("Teléfono Dueño", value=v.get("telefono_dueno_vehiculo",""))
-                email_d_m = st.text_input("E-Mail Dueño", value=v.get("email_dueno_vehiculo",""))
+            st.markdown("---")
+            st.markdown("### 💰 Modificar Valores Económicos")
+            col_m_eco1, col_m_eco2, col_m_eco3 = st.columns(3)
+            
+            with col_m_eco1:
+                val_inicial = f"{int(v.get('valor') or 0):,}".replace(",", ".")
+                txt_valor_m = st.text_input("Valor Vehículo ($)", value=val_inicial, key="mod_txt_val")
+                valor_m = int(txt_valor_m.replace(".", "").replace("$", "").strip() or 0)
+                st.caption(f"🔎 Sombra: **${valor_m:,.0f}**".replace(",", "."))
+                
+            with col_m_eco2:
+                com_inicial = f"{int(v.get('comision') or 0):,}".replace(",", ".")
+                txt_comision_m = st.text_input("Comisión ($)", value=com_inicial, key="mod_txt_com")
+                comision_m = int(txt_comision_m.replace(".", "").replace("$", "").strip() or 0)
+                st.caption(f"🔎 Sombra: **${comision_m:,.0f}**".replace(",", "."))
+                
+            with col_m_eco3:
+                trans_inicial = f"{int(v.get('transferencia') or 0):,}".replace(",", ".")
+                txt_transferencia_m = st.text_input("Transferencia ($)", value=trans_inicial, key="mod_txt_trans")
+                transferencia_m = int(txt_transferencia_m.replace(".", "").replace("$", "").strip() or 0)
+                st.caption(f"🔎 Sombra: **${transferencia_m:,.0f}**".replace(",", "."))
+            
+            valor_final_m = valor_m + comision_m + transferencia_m
+            st.warning(f"💵 **Nuevo Valor Final:** ${valor_final_m:,.0f}".replace(",", "."))
+            st.markdown("---")
 
-                actualizar_v = st.form_submit_button("💾 Actualizar Vehículo")
+            st.markdown("**📋 Modificar Datos del Dueño**")
+            nombre_d_m = st.text_input("Nombre Dueño", value=v.get("nombre_dueno_vehiculo",""))
+            rut_d_m = st.text_input("RUT Dueño (Acepta con o sin guion)", value=v.get("rut_dueno_vehiculo",""))
+            dir_d_m = st.text_input("Dirección Dueño", value=v.get("direccion_dueno_vehiculo",""))
+            tel_d_m = st.text_input("Teléfono Dueño", value=v.get("telefono_dueno_vehiculo",""))
+            email_d_m = st.text_input("E-Mail Dueño", value=v.get("email_dueno_vehiculo",""))
 
-            if actualizar_v:
-                v_due, r_due = validar_rut(rut_d_m)
-                if not v_due: st.error("❌ RUT Dueño inválido.")
+            st.write("")
+            if st.button("💾 Guardar Cambios y Actualizar Vehículo", use_container_width=True, type="primary"):
+                rut_d_limpio = rut_d_m.replace(".","").replace("-","").strip()
+                v_due, r_due = validar_rut(rut_d_limpio) if rut_d_limpio else (True, None)
+                
+                if rut_d_limpio and not v_due: 
+                    st.error("❌ El RUT del Dueño ingresado no es válido.")
                 else:
                     try:
                         con = conectar_bd()
@@ -1574,16 +1685,18 @@ with tab3:
                         cur.execute("""
                             UPDATE vehiculos SET
                                 marca=%s, modelo=%s, año=%s, kilometraje=%s, nro_chasis=%s, nro_motor=%s, nro_puertas=%s, color=%s,
-                                nombre_dueno_vehiculo=%s, rut_dueno_vehiculo=%s, direccion_dueno_vehiculo=%s, telefono_dueno_vehiculo=%s, email_dueno_vehiculo=%s
+                                nombre_dueno_vehiculo=%s, rut_dueno_vehiculo=%s, direccion_dueno_vehiculo=%s, telefono_dueno_vehiculo=%s, email_dueno_vehiculo=%s,
+                                valor=%s, comision=%s, transferencia=%s, valor_final=%s
                             WHERE patente=%s
                         """, (
                             marca_m.upper() or None, modelo_m.upper() or None, año_m, km_m, chasis_m or None, motor_m or None, puertas_m, color_m.upper() or None,
-                            nombre_d_m.upper() or None, r_due or None, dir_d_m or None, tel_d_m or None, email_d_m or None, v["patente"]
+                            nombre_d_m.upper() or None, r_due or None, dir_d_m or None, tel_d_m or None, email_d_m or None, 
+                            valor_m, comision_m, transferencia_m, valor_final_m, v["patente"]
                         ))
                         con.commit()
-                        st.success("✅ Vehículo actualizado.")
+                        st.success("✅ ¡Registro actualizado con éxito en la nube!")
                         del st.session_state["vehiculo_mod"]
-                    except Exception as e: st.error(f"❌ Error: {e}")
+                    except Exception as e: st.error(f"❌ Error al actualizar: {e}")
                     finally:
                         if "cur" in locals(): cur.close()
                         if "con" in locals(): con.close()
