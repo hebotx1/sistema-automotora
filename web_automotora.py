@@ -1323,7 +1323,7 @@ with tab2:
         st.markdown("**Datos obligatorios**")
         c1, c2 = st.columns(2)
         with c1:
-            rut_n = st.text_input("RUT * (Ej: 16328681-5 o 163286815)")
+            rut_n = st.text_input("RUT * (Ej: 11111111-1 o 111111111)")
             razon_n = st.text_input("Razón Social *")
             fantasia_n = st.text_input("Nombre Fantasía")
             giro_n = st.text_input("Giro")
