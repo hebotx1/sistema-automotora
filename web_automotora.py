@@ -122,21 +122,6 @@ def conectar_bd():
         port="5432"
     )
 
-# --- BOTÓN REPARADOR TEMPORAL ---
-if st.button("🛠️ Reparar Base de Datos Web (Quitar Restricción de RUT)"):
-    try:
-        con = conectar_bd()
-        cur = con.cursor()
-        cur.execute("ALTER TABLE vehiculos DROP CONSTRAINT IF EXISTS vehiculos_rut_cliente_fkey;")
-        con.commit()
-        st.success("✅ ¡Listo! Regla estricta eliminada en Neon. Ya puedes guardar vehículos libremente.")
-    except Exception as e:
-        st.error(f"Error al intentar reparar: {e}")
-    finally:
-        if "cur" in locals(): cur.close()
-        if "con" in locals(): con.close()
-# ---------------------------------
-
 # ----------------------------------------------------------------
 # CREACIÓN DE PESTAÑAS PRINCIPALES
 # ----------------------------------------------------------------
