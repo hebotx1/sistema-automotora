@@ -122,6 +122,21 @@ def conectar_bd():
         port="5432"
     )
 
+# --- BOTÓN REPARADOR TEMPORAL ---
+if st.button("🛠️ Reparar Base de Datos Web (Quitar Restricción de RUT)"):
+    try:
+        con = conectar_bd()
+        cur = con.cursor()
+        cur.execute("ALTER TABLE vehiculos DROP CONSTRAINT IF EXISTS vehiculos_rut_cliente_fkey;")
+        con.commit()
+        st.success("✅ ¡Listo! Regla estricta eliminada en Neon. Ya puedes guardar vehículos libremente.")
+    except Exception as e:
+        st.error(f"Error al intentar reparar: {e}")
+    finally:
+        if "cur" in locals(): cur.close()
+        if "con" in locals(): con.close()
+# ---------------------------------
+
 # ----------------------------------------------------------------
 # CREACIÓN DE PESTAÑAS PRINCIPALES
 # ----------------------------------------------------------------
@@ -1281,11 +1296,11 @@ with tab1:
                                     if clave in parrafo.text:
                                         for run in parrafo.runs:
                                             if clave in run.text: run.text = run.text.replace(clave, str(valor) if valor else "")
-                            for pr in doc.paragraphs: reemplazar_en_parrafo(pr, reemplazos)
+                            for p in doc.paragraphs: reemplazar_en_parrafo(p, reemplazos)
                             for tabla in doc.tables:
                                 for fila in tabla.rows:
                                     for celda in fila.cells:
-                                        for pr in celda.paragraphs: reemplazar_en_parrafo(pr, reemplazos)
+                                        for p in celda.paragraphs: reemplazar_en_parrafo(p, reemplazos)
                             buffer = io.BytesIO()
                             doc.save(buffer)
                             buffer.seek(0)
@@ -1345,14 +1360,12 @@ with tab2:
             observaciones_n = st.text_area("Observaciones")
 
         st.write("")
-        # Botón de guardado libre de st.form
         guardar_cliente = st.button("💾 Guardar Cliente", use_container_width=True, type="primary")
 
         if guardar_cliente:
             if not rut_n or not razon_n:
                 st.error("⚠️ El RUT y la Razón Social son obligatorios.")
             else:
-                # Limpieza inteligente del RUT para validar
                 rut_limpio = rut_n.replace(".","").replace("-","").strip()
                 v_rut, r_rut = validar_rut(rut_limpio)
                 
@@ -1360,7 +1373,6 @@ with tab2:
                     st.error("❌ El RUT del Cliente es inválido.")
                 else:
                     try:
-                        # Aseguramos el formato con guion para la Base de Datos
                         if len(r_rut) > 1:
                             r_rut = f"{r_rut[:-1]}-{r_rut[-1]}"
 
@@ -1398,7 +1410,6 @@ with tab2:
             if not rut_mod.strip(): 
                 st.warning("⚠️ Ingresa un RUT válido.")
             else:
-                # Transformamos la búsqueda para que calce exacto con la base de datos
                 rut_limpio = rut_mod.replace(".", "").replace("-", "").strip()
                 if len(rut_limpio) > 1:
                     rut_formateado = f"{rut_limpio[:-1]}-{rut_limpio[-1]}"
@@ -1536,7 +1547,6 @@ with tab3:
 
         st.markdown("**👤 Datos del Cliente (quien trae el vehículo)**")
         rut_cli_v = st.text_input("RUT Cliente * (Acepta con o sin guion)")
-        st.markdown("<p style='color: gray; font-size: 12px; margin-top: -10px;'>El cliente debe estar creado previamente en la pestaña Clientes.</p>", unsafe_allow_html=True)
 
         st.markdown("**📋 Datos del Dueño del Vehículo** *(si es distinto al cliente)*")
         e1, e2 = st.columns(2)
@@ -1568,27 +1578,20 @@ with tab3:
                         con = conectar_bd()
                         cur = con.cursor()
                         
-                        # Usamos r_cli directamente (que ya viene con un solo guion de la funcion validar_rut)
-                        cur.execute("SELECT razon_social FROM clientes WHERE rut=%s", (r_cli,))
-                        cli = cur.fetchone()
-                        
-                        if not cli:
-                            st.error(f"❌ El cliente con RUT {r_cli} no está registrado. Ingrésalo primero en la pestaña 'Clientes'.")
-                        else:
-                            cur.execute("""
-                                INSERT INTO vehiculos (
-                                    patente, marca, modelo, año, kilometraje, nro_chasis, nro_motor, nro_puertas, color,
-                                    rut_cliente, nombre_dueno_vehiculo, rut_dueno_vehiculo, direccion_dueno_vehiculo, telefono_dueno_vehiculo, email_dueno_vehiculo,
-                                    valor, comision, transferencia, valor_final
-                                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                            """, (
-                                patente_limpia, marca_v.upper() or None, modelo_v.upper() or None, año_v, km_v,
-                                chasis_v or None, motor_v or None, puertas_v, color_v.upper() or None,
-                                r_cli, nombre_dueno_v.upper() or None, r_due or None, dir_dueno_v or None, tel_dueno_v or None, email_dueno_v or None,
-                                valor_v, comision_v, transferencia_v, valor_final_v
-                            ))
-                            con.commit()
-                            st.success(f"✅ ¡Vehículo **{patente_limpia}** registrado a nombre de {cli[0]}!")
+                        cur.execute("""
+                            INSERT INTO vehiculos (
+                                patente, marca, modelo, año, kilometraje, nro_chasis, nro_motor, nro_puertas, color,
+                                rut_cliente, nombre_dueno_vehiculo, rut_dueno_vehiculo, direccion_dueno_vehiculo, telefono_dueno_vehiculo, email_dueno_vehiculo,
+                                valor, comision, transferencia, valor_final
+                            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """, (
+                            patente_limpia, marca_v.upper() or None, modelo_v.upper() or None, año_v, km_v,
+                            chasis_v or None, motor_v or None, puertas_v, color_v.upper() or None,
+                            r_cli, nombre_dueno_v.upper() or None, r_due or None, dir_dueno_v or None, tel_dueno_v or None, email_dueno_v or None,
+                            valor_v, comision_v, transferencia_v, valor_final_v
+                        ))
+                        con.commit()
+                        st.success(f"✅ ¡Vehículo **{patente_limpia}** registrado con éxito al RUT {r_cli}!")
                     except pg_errors.UniqueViolation: 
                         st.error("❌ Error: Esa patente ya se encuentra registrada.")
                     except Exception as e: 
