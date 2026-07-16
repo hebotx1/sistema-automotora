@@ -1,0 +1,4 @@
+﻿.streamlit/secrets.toml
+__pycache__/
+*.pyc
+Contratos_Generados/
