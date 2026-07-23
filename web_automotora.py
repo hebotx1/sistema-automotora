@@ -1758,7 +1758,26 @@ def render_clientes():
     # --------------------------------------------------------
     if st.session_state["menu_clientes"] == "crear":
         st.subheader("Registrar Nuevo Cliente")
-        
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT rut, razon_social, giro, telefono, email, ciudad
+                FROM clientes ORDER BY razon_social ASC LIMIT 200
+            """)
+            filas_cli = cur.fetchall()
+            if filas_cli:
+                st.markdown("📋 **Clientes registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_cli, columns=["RUT", "Razón Social", "Giro", "Teléfono", "Email", "Ciudad"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
         st.markdown("**Datos obligatorios**")
         c1, c2 = st.columns(2)
         with c1:
@@ -1824,6 +1843,27 @@ def render_clientes():
     # --------------------------------------------------------
     elif st.session_state["menu_clientes"] == "modificar":
         st.subheader("Modificar Cliente Existente")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT rut, razon_social, giro, telefono, email, ciudad
+                FROM clientes ORDER BY razon_social ASC LIMIT 200
+            """)
+            filas_cli = cur.fetchall()
+            if filas_cli:
+                st.markdown("📋 **Clientes registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_cli, columns=["RUT", "Razón Social", "Giro", "Teléfono", "Email", "Ciudad"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
+        st.write("---")
         rut_key_cliente = f"rut_modificar_{st.session_state.get('_gen_cliente', 0)}"
         rut_mod = st.text_input("Ingresa el RUT a buscar (con o sin guion):", key=rut_key_cliente)
 
@@ -1934,6 +1974,27 @@ def render_creditos():
     # --------------------------------------------------------
     if st.session_state["menu_creditos"] == "crear":
         st.subheader("Registrar Nuevo Crédito")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT patente, rut_cliente, nombre_cliente,
+                       (COALESCE(cantidad_cuotas,0) - COALESCE(cuotas_pendientes, cantidad_cuotas, 0)) AS cuotas_pagadas,
+                       COALESCE(cantidad_cuotas,0) AS total_cuotas
+                FROM creditos ORDER BY creado_en DESC LIMIT 200
+            """)
+            filas_cre = cur.fetchall()
+            if filas_cre:
+                st.markdown("📋 **Créditos registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_cre, columns=["Patente", "RUT Cliente", "Nombre Cliente", "Cuotas Pagadas", "Total Cuotas"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
 
         st.markdown("**🚗 Vehículo y Cliente**")
         cr1, cr2 = st.columns(2)
@@ -2109,6 +2170,29 @@ def render_creditos():
     # --------------------------------------------------------
     elif st.session_state["menu_creditos"] == "modificar":
         st.subheader("Modificar Crédito Existente")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT patente, rut_cliente, nombre_cliente,
+                       (COALESCE(cantidad_cuotas,0) - COALESCE(cuotas_pendientes, cantidad_cuotas, 0)) AS cuotas_pagadas,
+                       COALESCE(cantidad_cuotas,0) AS total_cuotas
+                FROM creditos ORDER BY creado_en DESC LIMIT 200
+            """)
+            filas_cre = cur.fetchall()
+            if filas_cre:
+                st.markdown("📋 **Créditos registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_cre, columns=["Patente", "RUT Cliente", "Nombre Cliente", "Cuotas Pagadas", "Total Cuotas"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
+        st.write("---")
         patente_key_credito = f"patente_mod_creditos_{st.session_state.get('_gen_credito', 0)}"
         patente_mod_cr = st.text_input("Ingresa la Patente del crédito a buscar:", key=patente_key_credito)
 
@@ -2501,8 +2585,28 @@ def render_vehiculos():
     # --------------------------------------------------------
     if st.session_state["menu_vehiculos"] == "crear":
         st.subheader("Registrar Nuevo Vehículo")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT patente, marca, modelo, "año", kilometraje, color, ubicacion, estado_reserva
+                FROM vehiculos ORDER BY patente ASC LIMIT 200
+            """)
+            filas_veh = cur.fetchall()
+            if filas_veh:
+                st.markdown("📋 **Vehículos registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_veh, columns=["Patente", "Marca", "Modelo", "Año", "Km", "Color", "Ubicación", "Estado"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
         st.info("💡 Escribe los datos libremente. Los valores económicos se sumarán automáticamente en tiempo real.")
-        
+
         st.markdown("**🚗 Datos Técnicos del Vehículo**")
         v1, v2 = st.columns(2)
         with v1:
@@ -2647,6 +2751,27 @@ def render_vehiculos():
     # --------------------------------------------------------
     elif st.session_state["menu_vehiculos"] == "modificar":
         st.subheader("Modificar Vehículo Existente")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("""
+                SELECT patente, marca, modelo, "año", kilometraje, color, ubicacion, estado_reserva
+                FROM vehiculos ORDER BY patente ASC LIMIT 200
+            """)
+            filas_veh = cur.fetchall()
+            if filas_veh:
+                st.markdown("📋 **Vehículos registrados:**")
+                st.dataframe(
+                    pd.DataFrame(filas_veh, columns=["Patente", "Marca", "Modelo", "Año", "Km", "Color", "Ubicación", "Estado"]),
+                    use_container_width=True, hide_index=True,
+                )
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
+        st.write("---")
         pat_key_vehiculo = f"pat_mod_vehiculo_{st.session_state.get('_gen_vehiculo', 0)}"
         pat_mod = st.text_input("Ingresa la Patente a buscar:", key=pat_key_vehiculo)
         
