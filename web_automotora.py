@@ -1425,10 +1425,16 @@ def render_productos():
         try:
             con = conectar_bd()
             cur = con.cursor()
-            cur.execute("SELECT codigo_producto, descripcion, stock_actual FROM productos ORDER BY id DESC LIMIT 15")
+            cur.execute("""
+                SELECT codigo_producto, descripcion, stock_actual FROM productos
+                ORDER BY CASE WHEN codigo_producto ~ '^[0-9]+$'
+                              THEN LPAD(codigo_producto, 10, '0')
+                              ELSE codigo_producto END
+                LIMIT 200
+            """)
             filas_prod = cur.fetchall()
             if filas_prod:
-                st.markdown("📋 **Últimos Códigos de Producto registrados:**")
+                st.markdown("📋 **Códigos de Producto registrados:**")
                 st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
         except: pass
         finally:
@@ -1524,10 +1530,16 @@ def render_productos():
         try:
             con = conectar_bd()
             cur = con.cursor()
-            cur.execute("SELECT codigo_producto, descripcion, stock_actual FROM productos ORDER BY id DESC LIMIT 15")
+            cur.execute("""
+                SELECT codigo_producto, descripcion, stock_actual FROM productos
+                ORDER BY CASE WHEN codigo_producto ~ '^[0-9]+$'
+                              THEN LPAD(codigo_producto, 10, '0')
+                              ELSE codigo_producto END
+                LIMIT 200
+            """)
             filas_prod = cur.fetchall()
             if filas_prod:
-                st.markdown("📋 **Últimos Códigos de Producto registrados:**")
+                st.markdown("📋 **Códigos de Producto registrados:**")
                 st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
         except: pass
         finally:
