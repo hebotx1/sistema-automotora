@@ -1435,7 +1435,11 @@ def render_productos():
             filas_prod = cur.fetchall()
             if filas_prod:
                 st.markdown("📋 **Códigos de Producto registrados:**")
-                st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
+                st.dataframe(
+                    pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]),
+                    use_container_width=True, hide_index=True,
+                    column_config={"Stock": st.column_config.NumberColumn("Stock", alignment="center")},
+                )
         except: pass
         finally:
             if "cur" in locals(): cur.close()
@@ -1540,7 +1544,11 @@ def render_productos():
             filas_prod = cur.fetchall()
             if filas_prod:
                 st.markdown("📋 **Códigos de Producto registrados:**")
-                st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
+                st.dataframe(
+                    pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]),
+                    use_container_width=True, hide_index=True,
+                    column_config={"Stock": st.column_config.NumberColumn("Stock", alignment="center")},
+                )
         except: pass
         finally:
             if "cur" in locals(): cur.close()
