@@ -1382,6 +1382,22 @@ if "documentos" in tabs:
 # ================================================================
 # PESTAÑA 2 — GESTIÓN DE PRODUCTOS
 # ================================================================
+def obtener_siguiente_codigo_producto():
+    """Calcula el próximo código correlativo (001, 002, 003...) en base al
+    mayor código numérico ya registrado. Sin tope: al pasar de 999 sigue
+    con 1000, 1001, etc."""
+    try:
+        con = conectar_bd()
+        cur = con.cursor()
+        cur.execute("SELECT MAX(CAST(codigo_producto AS INTEGER)) FROM productos WHERE codigo_producto ~ '^[0-9]+$'")
+        maximo = cur.fetchone()[0]
+        return f"{(maximo or 0) + 1:03d}"
+    except Exception:
+        return "001"
+    finally:
+        if "cur" in locals(): cur.close()
+        if "con" in locals(): con.close()
+
 @st.fragment
 def render_productos():
     if "menu_productos" not in st.session_state:
@@ -1406,42 +1422,59 @@ def render_productos():
     if st.session_state["menu_productos"] == "crear":
         st.subheader("Registrar Nuevo Producto")
 
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("SELECT codigo_producto, descripcion, stock_actual FROM productos ORDER BY id DESC LIMIT 15")
+            filas_prod = cur.fetchall()
+            if filas_prod:
+                st.markdown("📋 **Últimos Códigos de Producto registrados:**")
+                st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
+        gen_p = st.session_state.get("_gen_producto", 0)
+        codigo_producto_p = obtener_siguiente_codigo_producto()
+
         st.markdown("**📦 Datos del Producto**")
         cp1, cp2 = st.columns(2)
         with cp1:
-            codigo_producto_p = st.text_input("Código Producto *", key="codigo_prod_crear")
-            codigo_barra_p = st.text_input("Código de Barra", key="codigo_barra_crear")
+            st.text_input("Código Producto (autogenerado)", value=codigo_producto_p, disabled=True, key=f"codigo_prod_crear_{gen_p}")
+            codigo_barra_p = st.text_input("Código de Barra", key=f"codigo_barra_crear_{gen_p}")
         with cp2:
-            descripcion_p = st.text_input("Descripción *", key="descripcion_prod_crear")
+            descripcion_p = st.text_input("Descripción *", key=f"descripcion_prod_crear_{gen_p}")
 
         st.markdown("---")
         st.markdown("### 📊 Stock")
         se1, se2, se3, se4 = st.columns(4)
         with se1:
-            stock_actual_p = st.number_input("Stock Actual", min_value=0, step=1, key="stock_actual_crear")
+            stock_actual_p = st.number_input("Stock Actual", min_value=0, step=1, key=f"stock_actual_crear_{gen_p}")
         with se2:
-            stock_minimo_p = st.number_input("Stock Mínimo", min_value=0, step=1, key="stock_minimo_crear")
+            stock_minimo_p = st.number_input("Stock Mínimo", min_value=0, step=1, key=f"stock_minimo_crear_{gen_p}")
         with se3:
             stock_reposicion_p = st.number_input(
-                "Stock Reposición", min_value=0, step=1, key="stock_reposicion_crear",
+                "Stock Reposición", min_value=0, step=1, key=f"stock_reposicion_crear_{gen_p}",
                 help="Umbral manual: al llegar aquí, es momento de empezar a comprar.",
             )
         with se4:
-            stock_maximo_p = st.number_input("Stock Máximo", min_value=0, step=1, key="stock_maximo_crear")
+            stock_maximo_p = st.number_input("Stock Máximo", min_value=0, step=1, key=f"stock_maximo_crear_{gen_p}")
 
         st.markdown("---")
         st.markdown("### 💰 Precio de Venta")
         st.markdown("_Puedes ingresar el costo con o sin puntos (Ej: 10.000 o 10000)_")
         pe1, pe2, pe3, pe4 = st.columns(4)
         with pe1:
+            costo_key_p = f"costo_prod_crear_{gen_p}"
             txt_costo_p = st.text_input(
-                "Costo ($) *", value="0", key="costo_prod_crear",
-                on_change=formatear_monto_callback, args=("costo_prod_crear",),
+                "Costo ($) *", value="0", key=costo_key_p,
+                on_change=formatear_monto_callback, args=(costo_key_p,),
             )
             costo_p = int(txt_costo_p.replace(".", "").replace("$", "").strip() or 0)
             st.caption(f"🔎 Sombra: **${costo_p:,.0f}**".replace(",", "."))
         with pe2:
-            margen_p = st.number_input("Margen (%)", min_value=0.0, step=0.5, format="%.2f", key="margen_prod_crear")
+            margen_p = st.number_input("Margen (%)", min_value=0.0, step=0.5, format="%.2f", key=f"margen_prod_crear_{gen_p}")
         with pe3:
             neto_p = round(costo_p * (1 + margen_p / 100))
             st.metric("Neto Afecto a IVA", f"${neto_p:,.0f}".replace(",", "."))
@@ -1453,8 +1486,8 @@ def render_productos():
         guardar_producto = st.button("💾 Guardar Producto", use_container_width=True, type="primary")
 
         if guardar_producto:
-            if not codigo_producto_p.strip() or not descripcion_p.strip():
-                st.error("⚠️ El Código de Producto y la Descripción son obligatorios.")
+            if not descripcion_p.strip():
+                st.error("⚠️ La Descripción es obligatoria.")
             else:
                 try:
                     con = conectar_bd()
@@ -1466,12 +1499,14 @@ def render_productos():
                             costo, margen_venta
                         ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
-                        codigo_producto_p.strip().upper(), codigo_barra_p.strip() or None, descripcion_p.upper(),
+                        codigo_producto_p, codigo_barra_p.strip() or None, descripcion_p.upper(),
                         stock_actual_p, stock_minimo_p, stock_maximo_p, stock_reposicion_p,
                         costo_p, margen_p,
                     ))
                     con.commit()
-                    st.success(f"✅ Producto **{codigo_producto_p.upper()}** registrado correctamente.")
+                    st.session_state["_gen_producto"] = st.session_state.get("_gen_producto", 0) + 1
+                    st.session_state["_flash_productos"] = f"✅ Producto **{codigo_producto_p}** registrado correctamente."
+                    st.rerun(scope="fragment")
                 except pg_errors.UniqueViolation:
                     st.error("❌ Ese Código de Producto ya existe.")
                 except Exception as e:
@@ -1485,6 +1520,21 @@ def render_productos():
     # --------------------------------------------------------
     elif st.session_state["menu_productos"] == "modificar":
         st.subheader("Modificar Producto Existente")
+
+        try:
+            con = conectar_bd()
+            cur = con.cursor()
+            cur.execute("SELECT codigo_producto, descripcion, stock_actual FROM productos ORDER BY id DESC LIMIT 15")
+            filas_prod = cur.fetchall()
+            if filas_prod:
+                st.markdown("📋 **Últimos Códigos de Producto registrados:**")
+                st.dataframe(pd.DataFrame(filas_prod, columns=["Código", "Descripción", "Stock"]), use_container_width=True, hide_index=True)
+        except: pass
+        finally:
+            if "cur" in locals(): cur.close()
+            if "con" in locals(): con.close()
+
+        st.write("---")
         busq_key_producto = f"busq_producto_mod_{st.session_state.get('_gen_producto', 0)}"
         busq_producto = st.text_input(
             "Ingresa el Código de Producto o Código de Barra a buscar:", key=busq_key_producto
